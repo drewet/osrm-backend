@@ -31,6 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "dynamic_graph.hpp"
 #include "import_edge.hpp"
 #include "../util/simple_logger.hpp"
+#include "../util/make_unique.hpp"
 
 #include <tbb/parallel_sort.h>
 
@@ -75,7 +76,7 @@ struct NodeBasedEdgeData
 using NodeBasedDynamicGraph = DynamicGraph<NodeBasedEdgeData>;
 
 // Factory method to create NodeBasedDynamicGraph from ImportEdges
-inline std::shared_ptr<NodeBasedDynamicGraph>
+inline std::unique_ptr<NodeBasedDynamicGraph>
 NodeBasedDynamicGraphFromImportEdges(int number_of_nodes, std::vector<ImportEdge> &input_edge_list)
 {
     static_assert(sizeof(NodeBasedEdgeData) == 16,
@@ -186,9 +187,8 @@ NodeBasedDynamicGraphFromImportEdges(int number_of_nodes, std::vector<ImportEdge
     SimpleLogger().Write() << "merged " << edges_list.size() - edge_count << " edges out of "
                            << edges_list.size();
 
-    auto graph = std::make_shared<NodeBasedDynamicGraph>(
+    return osrm::make_unique<NodeBasedDynamicGraph>(
         static_cast<NodeBasedDynamicGraph::NodeIterator>(number_of_nodes), edges_list);
-    return graph;
 }
 
 #endif // NODE_BASED_GRAPH_HPP

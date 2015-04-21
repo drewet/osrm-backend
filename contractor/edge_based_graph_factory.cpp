@@ -42,11 +42,12 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 EdgeBasedGraphFactory::EdgeBasedGraphFactory(
     const std::shared_ptr<NodeBasedDynamicGraph> &node_based_graph,
+    const SpeedProfileProperties &speed_profile,
+    const std::vector<NodeID> &barrier_node_list,
+    const std::vector<NodeID> &traffic_light_node_list,
     std::unique_ptr<RestrictionMap> restriction_map,
-    std::vector<NodeID> &barrier_node_list,
-    std::vector<NodeID> &traffic_light_node_list,
     std::vector<QueryNode> &node_info_list,
-    SpeedProfileProperties &speed_profile)
+    )
     : speed_profile(speed_profile),
       m_number_of_edge_based_nodes(std::numeric_limits<unsigned>::max()),
       m_node_info_list(node_info_list), m_node_based_graph(node_based_graph),

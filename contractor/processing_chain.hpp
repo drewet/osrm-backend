@@ -58,7 +58,6 @@ class Prepare
 
   protected:
     bool ParseArguments(int argc, char *argv[]);
-    void CheckRestrictionsFile(FingerPrint &fingerprint_orig);
     bool SetupScriptingEnvironment(lua_State *myLuaState,
                                    EdgeBasedGraphFactory::SpeedProfileProperties &speed_profile);
     std::size_t BuildEdgeExpandedGraph(lua_State *myLuaState,
@@ -66,15 +65,10 @@ class Prepare
                                        std::vector<EdgeBasedNode> &nodeBasedEdgeList,
                                        DeallocatingVector<EdgeBasedEdge> &edgeBasedEdgeList,
                                        EdgeBasedGraphFactory::SpeedProfileProperties &speed_profile);
-    void WriteNodeMapping();
+    void WriteNodeMapping(std::unique_ptr<std::vector<QueryNode>> internal_to_external_node_map);
     void BuildRTree(std::vector<EdgeBasedNode> &node_based_edge_list);
 
   private:
-    std::vector<QueryNode> internal_to_external_node_map;
-    std::vector<TurnRestriction> restriction_list;
-    std::vector<NodeID> barrier_node_list;
-    std::vector<NodeID> traffic_light_list;
-    std::vector<ImportEdge> edge_list;
 
     unsigned requested_num_threads;
     boost::filesystem::path config_file_path;

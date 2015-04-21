@@ -107,7 +107,6 @@ int Prepare::Process(int argc, char *argv[])
     LogPolicy::GetInstance().Unmute();
 
     FingerPrint fingerprint_orig;
-    CheckRestrictionsFile(fingerprint_orig);
 
     boost::filesystem::ifstream input_stream(input_path, std::ios::in | std::ios::binary);
 
@@ -138,20 +137,7 @@ int Prepare::Process(int argc, char *argv[])
     static_assert(sizeof(ImportEdge) == 20,
                   "changing ImportEdge type has influence on memory consumption!");
 #endif
-    NodeID number_of_node_based_nodes = readBinaryOSRMGraphFromStream(
-        input_stream, edge_list, barrier_node_list, traffic_light_list,
-        &internal_to_external_node_map, restriction_list);
-    input_stream.close();
 
-    if (edge_list.empty())
-    {
-        SimpleLogger().Write(logWARNING) << "The input data is empty, exiting.";
-        return 1;
-    }
-
-    SimpleLogger().Write() << restriction_list.size() << " restrictions, "
-                           << barrier_node_list.size() << " bollard nodes, "
-                           << traffic_light_list.size() << " traffic lights";
 
     std::vector<EdgeBasedNode> node_based_edge_list;
     unsigned number_of_edge_based_nodes = 0;
@@ -182,7 +168,7 @@ int Prepare::Process(int argc, char *argv[])
     node_based_edge_list.shrink_to_fit();
     SimpleLogger().Write() << "CRC32: " << crc32_value;
 
-    WriteNodeMapping();
+    WriteNodeMapping(std::move(internal_to_external_node_map));
 
     /***
      * Contracting the edge-expanded graph
@@ -421,31 +407,6 @@ bool Prepare::ParseArguments(int argc, char *argv[])
 }
 
 /**
- \brief Loads and checks file UUIDs
-*/
-void Prepare::CheckRestrictionsFile(FingerPrint &fingerprint_orig)
-{
-    boost::filesystem::ifstream restriction_stream(restrictions_path, std::ios::binary);
-    FingerPrint fingerprint_loaded;
-    unsigned number_of_usable_restrictions = 0;
-    restriction_stream.read((char *)&fingerprint_loaded, sizeof(FingerPrint));
-    if (!fingerprint_loaded.TestPrepare(fingerprint_orig))
-    {
-        SimpleLogger().Write(logWARNING) << ".restrictions was prepared with different build.\n"
-                                            "Reprocess to get rid of this warning.";
-    }
-
-    restriction_stream.read((char *)&number_of_usable_restrictions, sizeof(unsigned));
-    restriction_list.resize(number_of_usable_restrictions);
-    if (number_of_usable_restrictions > 0)
-    {
-        restriction_stream.read((char *)&(restriction_list[0]),
-                                number_of_usable_restrictions * sizeof(TurnRestriction));
-    }
-    restriction_stream.close();
-}
-
-/**
     \brief Setups scripting environment (lua-scripting)
     Also initializes speed profile.
 */
@@ -486,6 +447,7 @@ bool Prepare::SetupScriptingEnvironment(
     return true;
 }
 
+
 /**
  \brief Building an edge-expanded graph from node-based input and turn restrictions
 */
@@ -494,28 +456,44 @@ Prepare::BuildEdgeExpandedGraph(lua_State *lua_state,
                                 NodeID number_of_node_based_nodes,
                                 std::vector<EdgeBasedNode> &node_based_edge_list,
                                 DeallocatingVector<EdgeBasedEdge> &edge_based_edge_list,
-                                EdgeBasedGraphFactory::SpeedProfileProperties &speed_profile)
+                                const EdgeBasedGraphFactory::SpeedProfileProperties &speed_profile)
 {
+    std::unordered_map<NodeID, NodeID> external_to_internal_node_map;
+    auto internal_to_external_node_map = osrm::make_unique<std::vector<QueryNode>>();
+    std::vector<NodeID> barrier_node_list;
+    std::vector<NodeID> traffic_light_list;
+    std::vector<ImportEdge> edge_list;
+
+    NodeID number_of_node_based_nodes = loadNodesFromFile(input_stream, barrier_node_list, traffic_light_list, internal_to_external_node_map, external_to_internal_node_map);
+    loadEdgesFromFile(input_stream, external_to_internal_node_map, edge_list);
+    loadRestrictionsFromFile(input_stream, external_to_internal_node_map, restriction_list);
+    input_stream.close();
+
+    if (edge_list.empty())
+    {
+        SimpleLogger().Write(logWARNING) << "The input data is empty, exiting.";
+        return 1;
+    }
+
+    SimpleLogger().Write() << restriction_list.size() << " restrictions, "
+                           << barrier_node_list.size() << " bollard nodes, "
+                           << traffic_light_list.size() << " traffic lights";
+
     SimpleLogger().Write() << "Generating edge-expanded graph representation";
-    std::shared_ptr<NodeBasedDynamicGraph> node_based_graph =
+    std::unique_ptr<NodeBasedDynamicGraph> node_based_graph =
         NodeBasedDynamicGraphFromImportEdges(number_of_node_based_nodes, edge_list);
-    std::unique_ptr<RestrictionMap> restriction_map =
-        osrm::make_unique<RestrictionMap>(restriction_list);
-    std::shared_ptr<EdgeBasedGraphFactory> edge_based_graph_factory =
-        std::make_shared<EdgeBasedGraphFactory>(node_based_graph, std::move(restriction_map),
-                                                barrier_node_list, traffic_light_list,
-                                                internal_to_external_node_map, speed_profile);
+
+    EdgeBasedGraphFactory edge_based_graph_factory(std::move(node_based_graph),
+                                                   std::move(restriction_map),
+                                                   std::move(barrier_node_list),
+                                                   std::move(traffic_light_list),
+                                                   internal_to_external_node_map);
+
+    // FIXME Use scoping for this instead of explicitly clearing it
     edge_list.clear();
     edge_list.shrink_to_fit();
 
-    edge_based_graph_factory->Run(edge_out, geometry_filename, lua_state);
-
-    restriction_list.clear();
-    restriction_list.shrink_to_fit();
-    barrier_node_list.clear();
-    barrier_node_list.shrink_to_fit();
-    traffic_light_list.clear();
-    traffic_light_list.shrink_to_fit();
+    edge_based_graph_factory.Run(edge_out, geometry_filename, lua_state);
 
     const std::size_t number_of_edge_based_nodes =
         edge_based_graph_factory->GetNumberOfEdgeBasedNodes();
@@ -529,29 +507,24 @@ Prepare::BuildEdgeExpandedGraph(lua_State *lua_state,
     edge_based_graph_factory->GetEdgeBasedEdges(edge_based_edge_list);
     edge_based_graph_factory->GetEdgeBasedNodes(node_based_edge_list);
 
-    edge_based_graph_factory.reset();
-    node_based_graph.reset();
-
     return number_of_edge_based_nodes;
 }
 
 /**
   \brief Writing info on original (node-based) nodes
  */
-void Prepare::WriteNodeMapping()
+void Prepare::WriteNodeMapping(std::unique_ptr<std::vector<QueryNode>> internal_to_external_node_map)
 {
     SimpleLogger().Write() << "writing node map ...";
     boost::filesystem::ofstream node_stream(node_filename, std::ios::binary);
-    const unsigned size_of_mapping = internal_to_external_node_map.size();
+    const unsigned size_of_mapping = internal_to_external_node_map->size();
     node_stream.write((char *)&size_of_mapping, sizeof(unsigned));
     if (size_of_mapping > 0)
     {
-        node_stream.write((char *)&(internal_to_external_node_map[0]),
+        node_stream.write((char *) internal_to_external_node_map->data(),
                           size_of_mapping * sizeof(QueryNode));
     }
     node_stream.close();
-    internal_to_external_node_map.clear();
-    internal_to_external_node_map.shrink_to_fit();
 }
 
 /**
