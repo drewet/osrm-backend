@@ -290,6 +290,11 @@ void EdgeBasedGraphFactory::CompressGeometry()
             continue;
         }
 
+        /*
+         * v ---> w
+         * v ---> w
+         */
+
         const bool reverse_edge_order =
             !(m_node_based_graph->GetEdgeData(m_node_based_graph->BeginEdges(node_v)).forward);
         const EdgeID forward_e2 = m_node_based_graph->BeginEdges(node_v) + reverse_edge_order;
@@ -299,8 +304,6 @@ void EdgeBasedGraphFactory::CompressGeometry()
 
         const EdgeData &fwd_edge_data2 = m_node_based_graph->GetEdgeData(forward_e2);
         const EdgeData &rev_edge_data2 = m_node_based_graph->GetEdgeData(reverse_e2);
-        BOOST_ASSERT(fwd_edge_data2.forward);
-        BOOST_ASSERT(!rev_edge_data2.forward);
 
         const NodeID node_w = m_node_based_graph->GetTarget(forward_e2);
         BOOST_ASSERT(SPECIAL_NODEID != node_w);
@@ -318,8 +321,6 @@ void EdgeBasedGraphFactory::CompressGeometry()
 
         const EdgeData &fwd_edge_data1 = m_node_based_graph->GetEdgeData(forward_e1);
         const EdgeData &rev_edge_data1 = m_node_based_graph->GetEdgeData(reverse_e1);
-        BOOST_ASSERT(fwd_edge_data1.forward);
-        BOOST_ASSERT(!rev_edge_data1.forward);
 
         if (m_node_based_graph->FindEdgeInEitherDirection(node_u, node_w) != SPECIAL_EDGEID)
         {
