@@ -299,6 +299,8 @@ void EdgeBasedGraphFactory::CompressGeometry()
 
         const EdgeData &fwd_edge_data2 = m_node_based_graph->GetEdgeData(forward_e2);
         const EdgeData &rev_edge_data2 = m_node_based_graph->GetEdgeData(reverse_e2);
+        BOOST_ASSERT(fwd_edge_data2.forward);
+        BOOST_ASSERT(!rev_edge_data2.forward);
 
         const NodeID node_w = m_node_based_graph->GetTarget(forward_e2);
         BOOST_ASSERT(SPECIAL_NODEID != node_w);
@@ -316,6 +318,8 @@ void EdgeBasedGraphFactory::CompressGeometry()
 
         const EdgeData &fwd_edge_data1 = m_node_based_graph->GetEdgeData(forward_e1);
         const EdgeData &rev_edge_data1 = m_node_based_graph->GetEdgeData(reverse_e1);
+        BOOST_ASSERT(fwd_edge_data1.forward);
+        BOOST_ASSERT(!rev_edge_data1.forward);
 
         if (m_node_based_graph->FindEdgeInEitherDirection(node_u, node_w) != SPECIAL_EDGEID)
         {
@@ -336,7 +340,7 @@ void EdgeBasedGraphFactory::CompressGeometry()
             const int reverse_weight2 = m_node_based_graph->GetEdgeData(reverse_e2).distance;
 
             BOOST_ASSERT(0 != reverse_weight1);
-            BOOST_ASSERT(0 != forward_weight2);
+            BOOST_ASSERT(0 != reverse_weight2);
 
             const bool has_node_penalty = m_traffic_lights.find(node_v) != m_traffic_lights.end();
 
