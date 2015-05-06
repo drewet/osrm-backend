@@ -125,13 +125,15 @@ NodeBasedDynamicGraphFromImportEdges(int number_of_nodes, std::vector<ImportEdge
         }
     }
 
+    // sort edges by source node id
+    tbb::parallel_sort(edges_list.begin(), edges_list.end());
+
     // this code removes multi-edges
     // my merging mutli-edges bi-directional edges can become directional again!
     // Consider the following example:
     // a --5-- b
     //  `--1--^
     // After merging we need to split {a, b, 5} into (a, b, 1) and (b, a, 5)
-    tbb::parallel_sort(edges_list.begin(), edges_list.end());
     NodeID edge_count = 0;
     for (NodeID i = 0; i < edges_list.size();)
     {
