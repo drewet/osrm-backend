@@ -63,8 +63,8 @@ int Prepare::Run()
 #ifdef WIN32
 #pragma message("Memory consumption on Windows can be higher due to different bit packing")
 #else
-    static_assert(sizeof(ImportEdge) == 20,
-                  "changing ImportEdge type has influence on memory consumption!");
+    static_assert(sizeof(NodeBasedEdge) == 20,
+                  "changing NodeBasedEdge type has influence on memory consumption!");
     static_assert(sizeof(EdgeBasedEdge) == 16,
                   "changing EdgeBasedEdge type has influence on memory consumption!");
 #endif
@@ -211,7 +211,7 @@ std::size_t Prepare::WriteContractedGraph(unsigned number_of_edge_based_nodes,
     for (const auto edge : osrm::irange<std::size_t>(0, contracted_edge_list->size()))
     {
         // no eigen loops
-        BOOST_ASSERT(contracted_edge_list->(edge).source != contracted_edge_list->(edge).target);
+        BOOST_ASSERT((*contracted_edge_list)[edge].source != (*contracted_edge_list)[edge].target);
         current_edge.target = (*contracted_edge_list)[edge].target;
         current_edge.data = (*contracted_edge_list)[edge].data;
 
@@ -221,12 +221,12 @@ std::size_t Prepare::WriteContractedGraph(unsigned number_of_edge_based_nodes,
         if (current_edge.data.distance <= 0)
         {
             SimpleLogger().Write(logWARNING) << "Edge: " << edge
-                                             << ",source: " << contracted_edge_list->at(edge).source
-                                             << ", target: " << contracted_edge_list->at(edge).target
+                                             << ",source: " << (*contracted_edge_list)[edge].source
+                                             << ", target: " << (*contracted_edge_list)[edge].target
                                              << ", dist: " << current_edge.data.distance;
 
             SimpleLogger().Write(logWARNING) << "Failed at adjacency list of node "
-                                             << contracted_edge_list->at(edge).source << "/"
+                                             << (*contracted_edge_list)[edge].source << "/"
                                              << node_array.size() - 1;
             return 1;
         }
@@ -325,7 +325,7 @@ Prepare::LoadNodeBasedGraph(std::vector<NodeID> &barrier_node_list,
                             RestrictionMap &restriction_map,
                             std::vector<QueryNode>& internal_to_external_node_map)
 {
-    std::vector<ImportEdge> edge_list;
+    std::vector<NodeBasedEdge> edge_list;
     std::unordered_map<NodeID, NodeID> external_to_internal_node_map;
 
     boost::filesystem::ifstream input_stream(config.osrm_input_path, std::ios::in | std::ios::binary);
